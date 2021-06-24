@@ -52,14 +52,19 @@ function (d::nd_DDE_Static)(dx, x, h!, p, t)
     checkbounds_p(p, gs.num_v, gs.num_e)
 
     gd = prep_gd(dx, x, d.graph_data, d.graph_structure)
-    h!(d.history, p, t - p[end])
+
+    #p[end] is now a list of lags, and history expected to be a VectorOfArrays whose ith component is the ith lag history.
+    #thus A[k,j] gives the vertex k component of the jth lag history and A[j] gives the entire jth lag history
+    for (i,lag) in enumerate(p[end])
+        h!(d.history[i], p, t - lag)
+    end
 
     @nd_threads d.parallel for i in 1:d.graph_structure.num_e
         maybe_idx(d.edges!, i).f!(
             get_edge(gd, i),
             get_src_vertex(gd, i),
             get_dst_vertex(gd, i),
-            view(d.history, d.graph_structure.s_e_idx[i]), view(d.history, d.graph_structure.d_e_idx[i]), p_e_idx(p, i), t)
+            view(d.history, d.graph_structure.s_e_idx[i],:), view(d.history, d.graph_structure.d_e_idx[i],:), p_e_idx(p, i), t)
     end
 
     @assert size(dx) == size(x) "Sizes of dx and x do not match"
@@ -69,7 +74,7 @@ function (d::nd_DDE_Static)(dx, x, h!, p, t)
             view(dx,d.graph_structure.v_idx[i]),
             get_vertex(gd, i),
             get_dst_edges(gd, i),
-            view(d.history, d.graph_structure.v_idx[i]), p_v_idx(p, i), t)
+            view(d.history, d.graph_structure.v_idx[i],:), p_v_idx(p, i), t)
     end
 
     nothing
